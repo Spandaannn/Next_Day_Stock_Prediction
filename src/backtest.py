@@ -21,35 +21,40 @@ Run:
     python src/backtest.py
 """
 
-import numpy as np
 import pandas as pd
-from pathlib import Path
+import numpy as np
 
-GRAPHS_DIR = Path("outputs/graphs")
-
-
-def run_backtest(df: pd.DataFrame, predictions: pd.Series, initial_capital: float = 100_000.0) -> pd.DataFrame:
+def run_backtest(predictions: pd.DataFrame, initial_capital: float = 10000.0) -> dict:
     """
-    Simulate the ML strategy vs Buy & Hold.
-
-    df must contain a 'Close' (or daily return) column aligned with `predictions`.
+    Simulates trading based on 'Predicted_Signal' and calculates returns.
+    
+    Args:
+        predictions (pd.DataFrame): Dataframe containing 'Close' prices and 'Predicted_Signal'.
+        initial_capital (float): Starting cash balance.
+        
+    Returns:
+        dict: Performance metrics (Total Return, Final Portfolio Value).
     """
-    # TODO (Person 2): implement on Day 4
-    raise NotImplementedError("run_backtest: to be implemented on Day 4")
-
-
-def compute_metrics(portfolio_values: pd.Series) -> dict:
-    """Total return, Sharpe ratio, max drawdown."""
-    # TODO (Person 2): implement on Day 4
-    raise NotImplementedError("compute_metrics: to be implemented on Day 4")
-
-
-def plot_comparison(strategy_values: pd.Series, buy_hold_values: pd.Series, out_name: str = "backtest_comparison.png"):
-    """Plot ML strategy vs Buy & Hold portfolio value over time."""
-    # TODO (Person 2): implement on Day 4
-    GRAPHS_DIR.mkdir(parents=True, exist_ok=True)
-    raise NotImplementedError("plot_comparison: to be implemented on Day 4")
-
-
-if __name__ == "__main__":
-    print("backtest.py scaffold ready — implement steps above on Day 4.")
+    backtest_df = predictions.copy()
+    
+    # Calculate daily log returns of the stock
+    backtest_df['Market_Returns'] = np.log(backtest_df['Close'] / backtest_df['Close'].shift(1))
+    
+    # Strategy returns = Signal from previous day multiplied by today's market return
+    backtest_df['Strategy_Returns'] = backtest_df['Predicted_Signal'].shift(1) * backtest_df['Market_Returns']
+    
+    # Calculate cumulative returns
+    backtest_df['Cumulative_Market'] = np.exp(backtest_df['Market_Returns'].cumsum())
+    backtest_df['Cumulative_Strategy'] = np.exp(backtest_df['Strategy_Returns'].fillna(0).cumsum())
+    
+    # Portfolio values
+    final_value = initial_capital * backtest_df['Cumulative_Strategy'].iloc[-1]
+    total_return = (backtest_df['Cumulative_Strategy'].iloc[-1] - 1) * 100
+    
+    metrics = {
+        "Initial Capital": initial_capital,
+        "Final Portfolio Value": round(final_value, 2),
+        "Total Strategy Return (%)": round(total_return, 2)
+    }
+    
+    return metrics
