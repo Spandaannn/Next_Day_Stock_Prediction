@@ -1,3 +1,18 @@
+# Virtual environment
+
+# Data files (regenerable via data_loader.py and preprocess.py)
+data/raw/*.csv
+data/processed/*.csv
+
+# Python cache
+*.pyc
+
+# Model files (Day 3 onward — can be large)
+
+# OS/editor clutter
+.DS_Store
+.vscode/
+
 # Python
 __pycache__/
 *.py[cod]
