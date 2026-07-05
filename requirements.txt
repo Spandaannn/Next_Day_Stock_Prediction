@@ -1,0 +1,14 @@
+# Core
+pandas
+numpy
+scikit-learn
+matplotlib
+plotly
+yfinance
+ta
+joblib
+
+# Optional (Phase 2 / dashboard)
+streamlit
+xgboost
+lightgbm

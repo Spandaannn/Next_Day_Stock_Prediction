@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+.ipynb_checkpoints/
+
+# Data & models (raw/processed data + trained models shouldn't bloat git history)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+models/*.pkl
+outputs/graphs/*
+outputs/reports/*
+!outputs/graphs/.gitkeep
+!outputs/reports/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
