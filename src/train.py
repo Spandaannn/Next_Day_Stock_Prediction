@@ -1,59 +1,85 @@
 """
 train.py
 --------
-Trains the stock direction prediction models.
-
-Owner: Person 1 (ML Engineer) — this file is scaffolded on Day 1
-so the project structure is in place; Person 1 fills in the logic
-on Day 3.
-
-Expected flow:
-    1. Load processed dataset from data/processed/processed.csv
-    2. Time-based train/test split (NO shuffling — prevents leakage)
-    3. Train Logistic Regression (baseline)
-    4. Train Random Forest (main model)
-    5. Save best model to models/model.pkl (use joblib)
-
-Run:
-    python src/train.py
+Day 3 task (Person 1): Train Logistic Regression (baseline) and
+Random Forest (main model) on Target_Direction, using a strict
+time-based train/test split.
 """
 
 import pandas as pd
+import numpy as np
 import joblib
 from pathlib import Path
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
-PROCESSED_DATA_PATH = Path("data/processed/processed.csv")
-MODEL_OUTPUT_PATH = Path("models/model.pkl")
+from features import FEATURE_COLUMNS, scale_features
 
-
-def load_data(path: Path = PROCESSED_DATA_PATH) -> pd.DataFrame:
-    """Load the feature-engineered dataset."""
-    # TODO (Person 1): implement once features.py produces processed.csv
-    raise NotImplementedError("load_data: waiting on Day 2 feature engineering output")
-
-
-def time_based_split(df: pd.DataFrame, test_size: float = 0.2):
-    """Split chronologically — train on earlier dates, test on later dates."""
-    # TODO (Person 1): implement time-based split (no random shuffling!)
-    raise NotImplementedError("time_based_split: to be implemented on Day 3")
+FEATURES_PATH = Path("data/processed/features.csv")
+MODEL_DIR = Path("models")
+TEST_FRACTION = 0.2  # last 20% of dates -> test set
 
 
-def train_models(X_train, y_train):
-    """Train Logistic Regression (baseline) and Random Forest (main)."""
-    # TODO (Person 1): fit LogisticRegression and RandomForestClassifier
-    raise NotImplementedError("train_models: to be implemented on Day 3")
+def load_features(path: Path = FEATURES_PATH) -> pd.DataFrame:
+    df = pd.read_csv(path, parse_dates=["Date"])
+    return df
 
 
-def save_model(model, path: Path = MODEL_OUTPUT_PATH):
-    """Persist the trained model with joblib."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(model, path)
-    print(f"Model saved to {path}")
+def time_based_split(df: pd.DataFrame, test_fraction: float = TEST_FRACTION):
+    """
+    Split by a DATE cutoff (not row index), applied globally across all
+    tickers at once. This keeps every ticker's split chronological:
+    train = earlier dates, test = later dates, no shuffling.
+    """
+    unique_dates = np.sort(df["Date"].unique())
+    cutoff_idx = int(len(unique_dates) * (1 - test_fraction))
+    cutoff_date = unique_dates[cutoff_idx]
+
+    train_df = df[df["Date"] < cutoff_date].reset_index(drop=True)
+    test_df = df[df["Date"] >= cutoff_date].reset_index(drop=True)
+    return train_df, test_df, cutoff_date
+
+
+def main():
+    df = load_features()
+    print(f"Loaded {len(df)} rows, {df['Ticker'].nunique()} tickers")
+
+    train_df, test_df, cutoff_date = time_based_split(df)
+    print(f"Split at {cutoff_date} -> train: {len(train_df)} rows, test: {len(test_df)} rows")
+
+    # Scale AFTER splitting - fit only on train (see features.py docstring)
+    train_scaled, test_scaled, scaler = scale_features(train_df, test_df)
+
+    X_train, y_train = train_scaled[FEATURE_COLUMNS], train_scaled["Target_Direction"]
+    X_test, y_test = test_scaled[FEATURE_COLUMNS], test_scaled["Target_Direction"]
+
+    # --- Baseline: Logistic Regression ---
+    log_reg = LogisticRegression(max_iter=1000)
+    log_reg.fit(X_train, y_train)
+    log_reg_acc = log_reg.score(X_test, y_test)
+    print(f"Logistic Regression test accuracy: {log_reg_acc:.4f}")
+
+    # --- Main model: Random Forest ---
+    rf = RandomForestClassifier(n_estimators=200, max_depth=5, random_state=42)
+    rf.fit(X_train, y_train)
+    rf_acc = rf.score(X_test, y_test)
+    print(f"Random Forest test accuracy: {rf_acc:.4f}")
+
+    # --- Save the better-performing model, plus the scaler it depends on ---
+    # predict.py MUST use this same scaler at inference time - applying the
+    # model to unscaled raw features would silently produce garbage predictions.
+    if rf_acc >= log_reg_acc:
+        best_model, best_name = rf, "RandomForest"
+    else:
+        best_model, best_name = log_reg, "LogisticRegression"
+
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(best_model, MODEL_DIR / "model.pkl")
+    joblib.dump(scaler, MODEL_DIR / "scaler.pkl")
+    joblib.dump(FEATURE_COLUMNS, MODEL_DIR / "feature_columns.pkl")
+    print(f"\nSaved best model ({best_name}) to {MODEL_DIR / 'model.pkl'}")
+    print(f"Saved matching scaler to {MODEL_DIR / 'scaler.pkl'}")
 
 
 if __name__ == "__main__":
-    df = load_data()
-    # X_train, X_test, y_train, y_test = time_based_split(df)
-    # model = train_models(X_train, y_train)
-    # save_model(model)
-    print("train.py scaffold ready — implement steps above on Day 3.")
+    main()
