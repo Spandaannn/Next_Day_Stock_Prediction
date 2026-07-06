@@ -93,7 +93,6 @@ def main():
     combined.to_csv(output_path, index=False)
     print(f"\nSaved {len(combined)} rows to {output_path}")
     print(combined.head())
-z
 
 if __name__ == "__main__":
     main()
